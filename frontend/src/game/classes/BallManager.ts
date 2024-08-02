@@ -1,3 +1,4 @@
+// src/game/classes/BallManager.ts
 import {
   HEIGHT,
   WIDTH,
@@ -16,17 +17,20 @@ export class BallManager {
   private obstacles: Obstacle[];
   private sinks: Sink[];
   private requestId?: number;
-  private onFinish?: (index: number, startX?: number) => void;
+  private onFinish?: (index: number, multiplier: number) => void;
+  private setPayout: (payout: number | null) => void;
 
   constructor(
     canvasRef: HTMLCanvasElement,
-    onFinish?: (index: number, startX?: number) => void,
+    onFinish?: (index: number, multiplier: number) => void,
+    setPayout: (payout: number | null) => void
   ) {
     this.balls = [];
     this.canvasRef = canvasRef;
     this.ctx = this.canvasRef.getContext("2d")!;
     this.obstacles = createObstacles();
     this.sinks = createSinks();
+    this.setPayout = setPayout;
     this.update();
     this.onFinish = onFinish;
   }
@@ -42,7 +46,9 @@ export class BallManager {
       this.sinks,
       (index) => {
         this.balls = this.balls.filter((ball) => ball !== newBall);
-        this.onFinish?.(index, startX);
+        const sink = this.sinks[index];
+        const multiplier = sink?.multiplier || 1;
+        this.onFinish?.(index, multiplier);  // Pass the multiplier to the onFinish callback
       },
     );
     this.balls.push(newBall);

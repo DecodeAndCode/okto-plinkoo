@@ -1,3 +1,4 @@
+// src/pages/Game.tsx
 import * as React from "react";
 import { useEffect, useRef, useState } from "react";
 import { BallManager } from "../game/classes/BallManager";
@@ -35,7 +36,7 @@ const data = [
 
 export function Game() {
   const [ballManager, setBallManager] = useState<BallManager>();
-  const canvasRef = useRef<any>();
+  const canvasRef = useRef<HTMLCanvasElement>(null);
   const [betAmount, setBetAmount] = useState("0.0000");
   const [risk, setRisk] = useState("medium");
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -45,21 +46,40 @@ export function Game() {
 
   useEffect(() => {
     if (canvasRef.current) {
-      const ballManager = new BallManager(
-        canvasRef.current as unknown as HTMLCanvasElement
+      const manager = new BallManager(
+        canvasRef.current,
+        (index, multiplier) => {
+          setMultiplier(multiplier);
+          const calculatedPayout = parseFloat(betAmount) * multiplier;
+          setPayout(calculatedPayout);  // Update payout only when the ball lands in a sink
+        },
+        (payout) => {
+          // This callback will be used to set the payout when needed
+          setPayout(payout);
+        }
       );
-      ballManager.onBallLanded = handleBallLanded;
-      setBallManager(ballManager);
+      setBallManager(manager);
     }
-  }, [canvasRef]);
+    return () => {
+      if (ballManager) {
+        ballManager.stop();
+      }
+    };
+  }, [canvasRef, betAmount]);
 
   const handleBet = async () => {
-    const response = await axios.post(`${baseURL}/game`, {
-      betAmount,
-      risk,
-    });
-    if (ballManager) {
-      ballManager.addBall(response.data.point);
+    try {
+      const response = await axios.post(`${baseURL}/game`, {
+        betAmount,
+        risk,
+      });
+      const { point } = response.data;
+      if (ballManager) {
+        ballManager.addBall(point);
+        // Payout calculation is handled by the BallManager's onFinish callback
+      }
+    } catch (error) {
+      console.error("Error placing bet:", error);
     }
   };
 
@@ -83,13 +103,6 @@ export function Game() {
   const handleCancel = () => {
     setTempBetAmount(betAmount);
     setDrawerOpen(false);
-  };
-
-  const handleBallLanded = (bucketIndex: number) => {
-    const multipliers = [1.5, 2.0, 2.5]; // Example multipliers for different buckets
-    const selectedMultiplier = multipliers[bucketIndex % multipliers.length];
-    setMultiplier(selectedMultiplier);
-    setPayout(parseFloat(betAmount) * selectedMultiplier);
   };
 
   return (
@@ -171,20 +184,17 @@ export function Game() {
               <option value="high">High</option>
             </select>
           </div>
-          <Button
-            className="control-button"
-            onClick={handleBet}
-          >
-            Bet
-          </Button>
+          <div className="bottom-controls">
+  <div className="payout-section">
+    <button className="payout-button" disabled>
+      {payout !== null ? `Payout: ${payout.toFixed(4)}` : 'Payout'}
+    </button>
+  </div>
+  <button className="control-button" onClick={handleBet}>
+    Bet
+  </button>
+</div>
         </div>
-        {payout !== null && (
-          <div className="payout-section">
-            <h2>Payout</h2>
-            <p>Multiplier: {multiplier}x</p>
-            <p>Payout Amount: {payout.toFixed(4)}</p>
-          </div>
-        )}
       </div>
     </div>
   );
